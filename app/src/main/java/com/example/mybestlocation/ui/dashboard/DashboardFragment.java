@@ -25,6 +25,7 @@ import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonArrayRequest;
+import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import com.example.mybestlocation.Location;
@@ -45,7 +46,10 @@ public class DashboardFragment extends Fragment implements LocationAdapter.OnLoc
     private RecyclerView recyclerView;
     private LocationAdapter locationAdapter;
     private RequestQueue requestQueue;
-    private static final String BASE_URL = "http://192.168.1.16/myapp/api/locations.php";
+    private static final String BASE_URL = "http://192.168.1.5/locations.php";
+    private static final String DELETE_URL = "http://192.168.1.5/deleteLocation.php";
+    private static final String EDIT_URL= "http://192.168.1.5/editLocation.php";
+
 
     // SMS Permission request code
     private static final int SMS_PERMISSION_REQUEST_CODE = 101;
@@ -103,7 +107,6 @@ public class DashboardFragment extends Fragment implements LocationAdapter.OnLoc
                 JSONObject obj = response.getJSONObject(i);
                 Location location = new Location(
                         obj.getInt("id"),
-                        obj.getString("name"),
                         obj.getString("pseudo"),
                         obj.getDouble("latitude"),
                         obj.getDouble("longitude")
@@ -116,21 +119,19 @@ public class DashboardFragment extends Fragment implements LocationAdapter.OnLoc
         return locations;
     }
 
-    @Override
-    public void onEditLocation(Location location) {
-        showEditLocationDialog(location);
-    }
+
 
     @Override
     public void onDeleteLocation(Location location) {
-        StringRequest stringRequest = new StringRequest(Request.Method.DELETE, BASE_URL,
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, DELETE_URL,
                 response -> {
-                    Toast.makeText(getContext(), "Location deleted", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Location deleted successfully!", Toast.LENGTH_SHORT).show();
                     fetchLocationsFromServer(); // Refresh the list
                 },
                 error -> Toast.makeText(getContext(), "Failed to delete location: " + error.getMessage(), Toast.LENGTH_SHORT).show()) {
             @Override
             public byte[] getBody() {
+                // Send the ID of the location to be deleted
                 return ("{\"id\":" + location.getId() + "}").getBytes();
             }
         };
@@ -169,10 +170,88 @@ public class DashboardFragment extends Fragment implements LocationAdapter.OnLoc
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
-
-    private void showEditLocationDialog(Location location) {
-        // Implementation for editing a location (not shown for brevity)
+    @Override
+    public void onEditLocation(Location location) {
+        showEditLocationDialog(location);
     }
+    private void showEditLocationDialog(Location location) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Edit Location");
+
+        // Create the input fields for pseudo, latitude, and longitude
+        final EditText inputPseudo = new EditText(getContext());
+        inputPseudo.setHint("Enter pseudo");
+        inputPseudo.setText(location.getPseudo());
+
+        final EditText inputLatitude = new EditText(getContext());
+        inputLatitude.setHint("Enter latitude");
+        inputLatitude.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        inputLatitude.setText(String.valueOf(location.getLatitude()));
+
+        final EditText inputLongitude = new EditText(getContext());
+        inputLongitude.setHint("Enter longitude");
+        inputLongitude.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        inputLongitude.setText(String.valueOf(location.getLongitude()));
+
+        LinearLayout layout = new LinearLayout(getContext());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.addView(inputPseudo);
+        layout.addView(inputLatitude);
+        layout.addView(inputLongitude);
+
+        builder.setView(layout);
+
+        builder.setPositiveButton("Save", (dialog, which) -> {
+            String pseudo = inputPseudo.getText().toString();
+            double latitude = Double.parseDouble(inputLatitude.getText().toString());
+            double longitude = Double.parseDouble(inputLongitude.getText().toString());
+
+            // Update the location object
+            location.setPseudo(pseudo);
+            location.setLatitude(latitude);
+            location.setLongitude(longitude);
+
+            // Send the updated location to the server
+            updateLocationOnServer(location);
+
+            Toast.makeText(getContext(), "Location updated", Toast.LENGTH_SHORT).show();
+        });
+
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+        builder.show();
+    }
+    private void updateLocationOnServer(Location location) {
+         // Make sure your URL is correct
+
+        // Create the JSON body with the updated location details
+        JSONObject locationJson = new JSONObject();
+        try {
+            locationJson.put("id", location.getId());
+            locationJson.put("pseudo", location.getPseudo());
+            locationJson.put("latitude", location.getLatitude());
+            locationJson.put("longitude", location.getLongitude());
+        } catch (JSONException e) {
+            Log.e("UpdateLocation", "Error creating JSON: " + e.getMessage(), e);
+        }
+
+        // Send the update request to the server
+        JsonObjectRequest updateRequest = new JsonObjectRequest(Request.Method.PUT, EDIT_URL, locationJson,
+                response -> {
+                    // Handle success (e.g., update UI or show a success message)
+                    Toast.makeText(getContext(), "Location updated successfully!", Toast.LENGTH_SHORT).show();
+                    fetchLocationsFromServer(); // Refresh the list of locations
+                },
+                error -> {
+                    // Handle error
+                    Toast.makeText(getContext(), "Failed to update location: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+
+        // Add the request to the request queue
+        requestQueue.add(updateRequest);
+    }
+
+
+
 
     private void showSmsDialog(Location location) {
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
@@ -197,7 +276,7 @@ public class DashboardFragment extends Fragment implements LocationAdapter.OnLoc
 
     private void sendSms(Location location, String phoneNumber) {
         try {
-            String message = "My position is: Latitude " + location.getLatitude() +
+            String message = "The position is Latitude " + location.getLatitude() +
                     ", Longitude " + location.getLongitude();
             SmsManager smsManager = SmsManager.getDefault();
             smsManager.sendTextMessage(phoneNumber, null, message, null, null);

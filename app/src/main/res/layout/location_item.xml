@@ -7,7 +7,7 @@
     android:padding="8dp">
 
     <TextView
-        android:id="@+id/text_view_location_name"
+        android:id="@+id/text_view_location_pseudo"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Location Name"
@@ -15,7 +15,7 @@
         android:textStyle="bold" />
 
     <TextView
-        android:id="@+id/text_view_location_pseudo"
+        android:id="@+id/id"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Pseudo"
@@ -31,13 +31,15 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Edit" />
+            android:backgroundTint="#8C009688"
+            android:text="edit" />
 
         <Button
             android:id="@+id/button_delete_location"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:backgroundTint="#CBF44336"
             android:text="Delete" />
 
         <Button
@@ -45,6 +47,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Send SMS" />
+            android:backgroundTint="#C98BC34A"
+            android:text="SMS" />
     </LinearLayout>
 </LinearLayout>

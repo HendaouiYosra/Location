@@ -9,11 +9,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
+import com.android.volley.toolbox.StringRequest;
 import com.example.mybestlocation.R;
 import com.example.mybestlocation.databinding.FragmentHomeBinding;
 import com.example.mybestlocation.Location; // Import the Location model
@@ -37,6 +39,7 @@ import com.android.volley.toolbox.JsonArrayRequest;
 import com.android.volley.toolbox.Volley;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedWriter;
@@ -45,6 +48,7 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -126,85 +130,62 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback {
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle("Add New Location");
 
-        final EditText inputName = new EditText(getContext());
+
         final EditText inputPseudo = new EditText(getContext());
 
-        inputName.setHint("Enter location name");
+
         inputPseudo.setHint("Enter your pseudo");
+        TextView locationText = new TextView(getContext());
+        locationText.setText("Latitude: " + latitude + "\nLongitude: " + longitude);
+        locationText.setPadding(0, 10, 0, 20);
+
 
         LinearLayout layout = new LinearLayout(getContext());
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.addView(inputName);
         layout.addView(inputPseudo);
+        layout.addView(locationText);
 
         builder.setView(layout);
         builder.setPositiveButton("Add", (dialog, which) -> {
-            String name = inputName.getText().toString();
             String pseudo = inputPseudo.getText().toString();
 
             // Log the data for debugging
-            Log.d("AddLocation", "Adding favorite location: name=" + name + ", pseudo=" + pseudo +
+            Log.d("AddLocation", "Adding favorite location: pseudo=" + pseudo +
                     ", latitude=" + latitude + ", longitude=" + longitude);
 
             // Call the function to save this favorite location
-            addFavoriteLocation(name, pseudo, latitude, longitude);
+            addFavoriteLocation( pseudo, latitude, longitude);
         });
 
         builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
         builder.show();
     }
 
-    private void addFavoriteLocation(String name, String pseudo, double latitude, double longitude) {
+    public void addFavoriteLocation(String pseudo, double latitude, double longitude) {
         // Your server URL to insert the favorite location
-        String serverUrl = "http://192.168.1.16/myapp/api/insert_favorite_location.php";  // Change this URL
+        String serverUrl = "http://192.168.1.5/addPostion.php";
 
-        new AsyncTask<Void, Void, String>() {
+        // Create a request to send the data to the server
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, serverUrl,
+                response -> {
+                    // On success, show the success message and add the marker to the map
+                    Toast.makeText(getContext(), "Location added successfully!", Toast.LENGTH_SHORT).show();
+                    addMarkerToMap(latitude, longitude, pseudo); // Update the map with the new marker
+                },
+                error -> {
+                    // On failure, show the error message
+                    Toast.makeText(getContext(), "Failed to add location: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                }) {
             @Override
-            protected String doInBackground(Void... voids) {
-                try {
-                    // Set up the URL connection
-                    URL url = new URL(serverUrl);
-                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                    connection.setRequestMethod("POST");
-                    connection.setDoOutput(true);
-
-                    // Prepare the POST data
-                    String data = "name=" + URLEncoder.encode(name, "UTF-8") +
-                            "&pseudo=" + URLEncoder.encode(pseudo, "UTF-8") +
-                            "&latitude=" + URLEncoder.encode(String.valueOf(latitude), "UTF-8") +
-                            "&longitude=" + URLEncoder.encode(String.valueOf(longitude), "UTF-8");
-
-                    // Send the data
-                    OutputStream os = connection.getOutputStream();
-                    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"));
-                    writer.write(data);
-                    writer.flush();
-                    writer.close();
-                    os.close();
-
-                    // Get the server response
-                    int responseCode = connection.getResponseCode();
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-                        return "Location added successfully!";
-                    } else {
-                        return "Error adding location: " + responseCode;
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    return "Exception: " + e.getMessage();
-                }
+            public byte[] getBody() {
+                // Prepare the POST data to send as JSON
+                String jsonData = "{\"pseudo\":\"" + pseudo + "\",\"latitude\":" + latitude + ",\"longitude\":" + longitude + "}";
+                return jsonData.getBytes(StandardCharsets.UTF_8);
             }
+        };
 
-            @Override
-            protected void onPostExecute(String result) {
-                // Show the result of the operation
-                Log.d("AddLocation", result);
-                if (result.equals("Location added successfully!")) {
-                    // Optionally, you can update the map with the new marker here
-                    addMarkerToMap(latitude, longitude, name);
-                }
-            }
-        }.execute();
+        // Add the request to the request queue
+        requestQueue.add(stringRequest);
     }
 
     private void addMarkerToMap(double latitude, double longitude, String title) {
@@ -221,50 +202,48 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private void displaySavedLocations(GoogleMap googleMap) {
-        String url = "http://192.168.1.16/myapp/api/locations.php";  // Update this URL
+        String url = "http://192.168.1.5/locations.php";
 
+        // Fetch data from your database via an API
         JsonArrayRequest jsonArrayRequest = new JsonArrayRequest(
                 Request.Method.GET,
                 url,
                 null,
                 response -> {
-                    Log.d("API Response", "Received response: " + response.toString());
                     try {
-                        List<Location> locationList = parseLocationsFromResponse(response);
+                        for (int i = 0; i < response.length(); i++) {
+                            JSONObject jsonObject = response.getJSONObject(i);
+                            String pseudo = jsonObject.getString("pseudo");
+                            double latitude = jsonObject.getDouble("latitude");
+                            double longitude = jsonObject.getDouble("longitude");
 
-                        // Add markers to the map
-                        if (locationList != null && !locationList.isEmpty()) {
-                            for (Location location : locationList) {
-                                LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-                                googleMap.addMarker(new MarkerOptions().position(latLng).title(location.getName()));
-                            }
-                        } else {
-                            Log.e("API Error", "No locations found.");
-                            Toast.makeText(getContext(), "No locations found", Toast.LENGTH_SHORT).show();
+                            // Add a marker for each location
+                            LatLng latLng = new LatLng(latitude, longitude);
+                            googleMap.addMarker(new MarkerOptions().position(latLng).title(pseudo));
                         }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        Log.e("API Error", "Error parsing response.");
+                    } catch (JSONException e) {
+                        Log.e("JSON Error", "Error parsing locations: " + e.getMessage());
                     }
                 },
                 error -> Log.e("API Error", "Error fetching data: " + error.getMessage())
         );
 
+        // Add the request to the queue
         requestQueue.add(jsonArrayRequest);
     }
+
 
     private List<Location> parseLocationsFromResponse(JSONArray response) {
         List<Location> locations = new ArrayList<>();
         try {
             for (int i = 0; i < response.length(); i++) {
                 JSONObject jsonObject = response.getJSONObject(i);
-                String name = jsonObject.getString("name");
                 String pseudo = jsonObject.getString("pseudo");  // Extract the pseudo
                 double latitude = jsonObject.getDouble("latitude");
                 double longitude = jsonObject.getDouble("longitude");
 
                 // Pass the pseudo along with the other parameters to the Location constructor
-                Location location = new Location(name, pseudo, latitude, longitude);
+                Location location = new Location( pseudo, latitude, longitude);
                 locations.add(location);
             }
         } catch (Exception e) {

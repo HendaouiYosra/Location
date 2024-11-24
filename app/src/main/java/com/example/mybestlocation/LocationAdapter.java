@@ -1,5 +1,6 @@
 package com.example.mybestlocation;
 
+import android.app.AlertDialog;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -31,8 +32,8 @@ public class LocationAdapter extends RecyclerView.Adapter<LocationAdapter.Locati
     @Override
     public void onBindViewHolder(@NonNull LocationViewHolder holder, int position) {
         Location location = locationList.get(position);
-        holder.nameTextView.setText(location.getName());
-        holder.pseudoTextView.setText(location.getPseudo());
+        holder.pseudoTextView.setText(String.valueOf(location.getId()));
+        holder.nameTextView.setText(location.getPseudo());
 
         // Set up the Edit button action
         holder.editButton.setOnClickListener(v -> {
@@ -43,9 +44,16 @@ public class LocationAdapter extends RecyclerView.Adapter<LocationAdapter.Locati
 
         // Set up the Delete button action
         holder.deleteButton.setOnClickListener(v -> {
-            if (onLocationActionListener != null) {
-                onLocationActionListener.onDeleteLocation(location);
-            }
+            new AlertDialog.Builder(holder.itemView.getContext())
+                    .setTitle("Confirm Delete")
+                    .setMessage("Are you sure you want to delete this location?")
+                    .setPositiveButton("Yes", (dialog, which) -> {
+                        if (onLocationActionListener != null) {
+                            onLocationActionListener.onDeleteLocation(location);
+                        }
+                    })
+                    .setNegativeButton("No", (dialog, which) -> dialog.dismiss())
+                    .show();
         });
 
         // Set up the Send SMS button action
@@ -78,8 +86,8 @@ public class LocationAdapter extends RecyclerView.Adapter<LocationAdapter.Locati
 
         public LocationViewHolder(@NonNull View itemView) {
             super(itemView);
-            nameTextView = itemView.findViewById(R.id.text_view_location_name);
-            pseudoTextView = itemView.findViewById(R.id.text_view_location_pseudo);
+            nameTextView = itemView.findViewById(R.id.text_view_location_pseudo);
+            pseudoTextView = itemView.findViewById(R.id.id);
             editButton = itemView.findViewById(R.id.button_edit_location);
             deleteButton = itemView.findViewById(R.id.button_delete_location);
             sendSmsButton = itemView.findViewById(R.id.button_send_sms); // New "Send SMS" button

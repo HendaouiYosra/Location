@@ -51,8 +51,7 @@ public class MainNavigationActivity extends AppCompatActivity {
                 break;
             case R.id.nav_dashboard:
                 selectedFragment = new DashboardFragment();
-                break;
-            case R.id.nav_notifications:
+
                 // selectedFragment = new NotificationsFragment();
                 break;
 
